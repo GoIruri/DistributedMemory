@@ -26,3 +26,24 @@ func UserSignup(username string, passwd string) bool {
 
 	return false
 }
+
+// UserSignin 判断密码是否一致
+func UserSignin(username string, encpwd string) bool {
+	stmt, err := mydb.DBConn().Prepare("select user_pwd from tbl_user where user_name=? limit 1")
+	if err != nil {
+		fmt.Println(err.Error())
+		return false
+	}
+
+	var pwd string
+	err = stmt.QueryRow(username).Scan(&pwd)
+	if err != nil {
+		fmt.Println("username not found")
+		return false
+	}
+	if pwd == encpwd {
+		return true
+	}
+
+	return false
+}

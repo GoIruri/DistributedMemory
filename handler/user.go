@@ -39,3 +39,10 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("FAILED"))
 	}
 }
+
+// SignInHandler 登录接口
+func SignInHandler(w http.ResponseWriter, r http.Request) {
+	// 1校验用户名及密码
+	// 2生成访问凭证(token)
+	// 3登录成功后重定向到首页
+}
