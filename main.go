@@ -15,8 +15,9 @@ func main() {
 	http.HandleFunc("/file/delete", handler.FileDeleteHandler)
 
 	http.HandleFunc("/user/signup", handler.SignupHandler)
+	http.HandleFunc("/user/signin", handler.SignInHandler)
 
-	err := http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":9999", nil)
 	if err != nil {
 		fmt.Printf("Failed to start server, err: %s", err.Error())
 	}
