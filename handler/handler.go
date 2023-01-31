@@ -1,6 +1,7 @@
 package handler
 
 import (
+	dblayer "DistributedMemory/db"
 	"DistributedMemory/meta"
 	"DistributedMemory/util"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -56,6 +58,16 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		//meta.UpdateFileMeta(fileMeta)
 		_ = meta.UpdateFileMetaDB(fileMeta)
 
+		// 更新用户文件表记录
+		r.ParseForm()
+		username := r.Form.Get("username")
+		suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
+		if suc {
+			http.Redirect(w, r, "/static/view/home.html", http.StatusFound)
+		} else {
+			w.Write([]byte("Upload Failed."))
+		}
+
 		// 重定向
 		http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
 	}
@@ -85,6 +97,27 @@ func GetFileMetaHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// FileQueryHandler 查询批量的文件元信息
+func FileQueryHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	limitCnt, _ := strconv.Atoi(r.Form.Get("limit"))
+	username := r.Form.Get("username")
+	userFiles, err := dblayer.QueryUserFileMetas(username, limitCnt)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(userFiles)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+}
+
+// DownLoadHandler 文件下载接口
 func DownLoadHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 

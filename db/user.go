@@ -75,6 +75,7 @@ type User struct {
 	Status       int
 }
 
+// GetUserInfo 查询用户信息
 func GetUserInfo(username string) (User, error) {
 	user := User{}
 

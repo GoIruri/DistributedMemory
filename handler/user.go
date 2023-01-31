@@ -88,14 +88,14 @@ func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	// 1解析请求参数
 	r.ParseForm()
 	username := r.Form.Get("username")
-	token := r.Form.Get("token")
+	//token := r.Form.Get("token")
 
 	// 2验证token是否有效
-	isValidToken := IsTokenValid(username, token)
-	if !isValidToken {
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
+	//isValidToken := IsTokenValid(username, token)
+	//if !isValidToken {
+	//	w.WriteHeader(http.StatusForbidden)
+	//	return
+	//}
 
 	// 3查询用户信息
 	user, err := dblayer.GetUserInfo(username)
@@ -108,7 +108,7 @@ func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	resp := util.RespMsg{
 		Code: 0,
 		Msg:  "OK",
-		Data: user,
+		Data: user.SignupAt,
 	}
 	w.Write(resp.JSONBytes())
 }
@@ -133,7 +133,7 @@ func IsTokenValid(username string, token string) bool {
 	}
 
 	// todo:从数据库表tbl_user_token查询username对应的token信息
-	stmt, err := mydb.DBConn().Prepare("select user_token from tbl_user_token where username = ?")
+	stmt, err := mydb.DBConn().Prepare("select user_token from tbl_user_token where user_name = ?")
 	if err != nil {
 		fmt.Println(err.Error())
 		return false
