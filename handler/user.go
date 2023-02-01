@@ -45,6 +45,17 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 // SignInHandler 登录接口
 func SignInHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		// data, err := ioutil.ReadFile("./static/view/signin.html")
+		// if err != nil {
+		// 	w.WriteHeader(http.StatusInternalServerError)
+		// 	return
+		// }
+		// w.Write(data)
+		http.Redirect(w, r, "/static/view/signin.html", http.StatusFound)
+		return
+	}
+
 	r.ParseForm()
 	username := r.Form.Get("username")
 	password := r.Form.Get("password")
