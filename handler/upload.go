@@ -1,13 +1,16 @@
 package handler
 
 import (
+	cmn "DistributedMemory/common"
+	cfg "DistributedMemory/config"
 	dblayer "DistributedMemory/db"
 	"DistributedMemory/meta"
+	"DistributedMemory/mq"
 	"DistributedMemory/store/ceph"
+	"DistributedMemory/store/oss"
 	"DistributedMemory/util"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/amz.v1/s3"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -57,16 +60,73 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		// 设置下一次读写的位置
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
+
+		// 游标重新回到文件头
+		newFile.Seek(0, 0)
+		if cfg.CurrentStoreType == cmn.StoreCeph {
+			// 文件写入Ceph存储
+			data, _ := ioutil.ReadAll(newFile)
+			cephPath := "/ceph/" + fileMeta.FileSha1
+			_ = ceph.PutObject("userfile", cephPath, data)
+			fileMeta.Location = cephPath
+		} else if cfg.CurrentStoreType == cmn.StoreOSS {
+			// 文件写入OSS存储
+			ossPath := "oss/" + fileMeta.FileSha1
+			//err = oss.Bucket().PutObject(ossPath,newFile)
+			//if err != nil {
+			//	fmt.Println(err.Error())
+			//	w.Write([]byte("Upload failed!"))
+			//	return
+			//}
+			//fileMeta.Location = ossPath
+			// 判断写入OSS为同步还是异步
+			if !cfg.AsyncTransferEnable {
+				err = oss.Bucket().PutObject(ossPath, newFile)
+				if err != nil {
+					fmt.Println(err.Error())
+					w.Write([]byte("Upload failed!"))
+					return
+				}
+				fileMeta.Location = ossPath
+			} else {
+				// 写入异步转移任务队列
+				data := mq.TransferData{
+					FileHash:      fileMeta.FileSha1,
+					CurLocation:   fileMeta.Location,
+					DestLocation:  ossPath,
+					DestStoreType: cmn.StoreOSS,
+				}
+				pubData, _ := json.Marshal(data)
+				pubSuc := mq.Publish(
+					cfg.TransExchangeName,
+					cfg.TransOSSRoutingKey,
+					pubData,
+				)
+				if !pubSuc {
+					// TODO: 当前发送转移信息失败，稍后重试
+				}
+			}
+		}
+
 		//meta.UpdateFileMeta(fileMeta)
 		_ = meta.UpdateFileMetaDB(fileMeta)
 
 		// 同时将文件写入ceph存储
 		newFile.Seek(0, 0)
-		data, _ := ioutil.ReadAll(newFile)
-		bucket := ceph.GetCephBucket("userfile")
-		cephPath := "/ceph/" + fileMeta.FileSha1
-		_ = bucket.Put(cephPath, data, "octet-stream", s3.PublicRead)
-		fileMeta.Location = cephPath
+		//data, _ := ioutil.ReadAll(newFile)
+		//bucket := ceph.GetCephBucket("userfile")
+		//cephPath := "/ceph/" + fileMeta.FileSha1
+		//_ = bucket.Put(cephPath, data, "octet-stream", s3.PublicRead)
+		//fileMeta.Location = cephPath
+
+		ossPath := "oss/" + fileMeta.FileSha1
+		err = oss.Bucket().PutObject(ossPath, newFile)
+		if err != nil {
+			fmt.Println(err.Error())
+			w.Write([]byte("Upload failed!"))
+			return
+		}
+		fileMeta.Location = ossPath
 
 		// 更新用户文件表记录
 		r.ParseForm()
@@ -243,4 +303,17 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(resp.JSONBytes())
 		return
 	}
+}
+
+// DownloadURLHandler 生成文件的下载地址
+func DownloadURLHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	filehash := r.Form.Get("filehash")
+	// 从文件表查找记录
+	row, _ := dblayer.GetFileMeta(filehash)
+
+	// todo:判断文件存在oss还是ceph
+
+	signedURL := oss.DownloadURL(row.FileAddr.String)
+	w.Write([]byte(signedURL))
 }
