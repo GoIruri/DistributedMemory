@@ -19,7 +19,7 @@ func Router() *gin.Engine {
 	router.POST("/user/signin", handler.DoSinginHandler)
 
 	// 加入中间件，用于校验token的拦截器
-	router.Use(handler.HTTPInterceptor)
+	router.Use(handler.HTTPInterceptor())
 
 	// Use之后的所有handler都会经过拦截器进行token校验
 }

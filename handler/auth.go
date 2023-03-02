@@ -1,19 +1,28 @@
 package handler
 
-import "net/http"
+import (
+	"DistributedMemory/common"
+	"DistributedMemory/util"
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
 
 // HTTPInterceptor http请求拦截器
-func HTTPInterceptor(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
-		username := r.Form.Get("username")
-		token := r.Form.Get("token")
+func HTTPInterceptor() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := c.Request.FormValue("username")
+		token := c.Request.FormValue("token")
 
 		if len(username) < 3 || !IsTokenValid(username, token) {
-			w.WriteHeader(http.StatusForbidden)
+			// token校验失败则跳转到直接返回失败提示
+			c.Abort()
+			resp := util.NewRespMsg(int(common.StatusParamInvalid),
+				"token 无效",
+				nil)
+			c.JSON(http.StatusForbidden, resp)
 			return
 		}
 
-		h(w, r)
+		c.Next()
 	}
 }
